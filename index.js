@@ -1,9 +1,16 @@
 const axios = require("axios");
+const crypto = require("crypto");
 
 const SYMBOL = "BTCUSDT";
-const BUY_PRICE = 34850;
-const SELL_PRICE = 35180;
+const QUANTITY = "0.0001";
+const BUY_PRICE = 35000;
+const SELL_PRICE = 35800;
+const API_KEY = "";
+const SECRET_KEY = "";
+
 let isOpened = false
+
+//URL de produção: "https://api.binance.com";
 const API_URL = "https://testnet.binance.vision"
 
 function calcSMA(data) {
@@ -14,6 +21,24 @@ function calcSMA(data) {
     );
 }
 
+async function newOrder(symbol,quantity,side){
+    const order = {symbol,quantity,side};
+    order.type = "MARKET";
+    order.timestamp = Date.now();
+    const signature = crypto.createHmac("sha256", SECRET_KEY).update(new URLSearchParams(order).toString()).digest("hex");
+    order.signature = signature;
+    try {
+        const {data} = await axios.post(
+            `${API_URL}/api/v3/order`,
+            new URLSearchParams(order).toString,
+            {headers: {"X-MBX-APIKEY": API_KEY}}
+        )
+        console.log(data);
+    } catch (err) {
+        console.error(err.response);
+    }
+}
+
 async function start() {
     const { data } = await axios.get(API_URL + "/api/v3/klines?limit=21&interval=15m&symbol=" + SYMBOL);
     const candle = data[data.length - 1];
@@ -21,31 +46,29 @@ async function start() {
     const sma  = calcSMA(data)
 
 
-    console.clear();
-    console.log(`Candle: ${candle}`);
-    console.log("Price: " + price);
-    console.log(`SMA: ${sma}`);
-    console.log(`Is Opened: ${isOpened}`);
+    // console.clear();
+    // console.log(`Candle: ${candle}`);
+    // console.log("Price: " + price);
+    // console.log(`SMA: ${sma}`);
+    // console.log(`Is Opened: ${isOpened}`);
 
-    if (price <= (sma * 0.02) && isOpened === false) {
-        console.log('BUY');
+    if (isOpened)
+        console.log("Sell Price: " + SELL_PRICE);
+    else
+        console.log("Buy Price: " + BUY_PRICE);
+
+    if (price < BUY_PRICE && !isOpened) {
+        console.log("Comprar!");
+        newOrder(SYMBOL, QUANTITY, "BUY");
         isOpened = true;
     }
-    else if (price >= (sma * 1.01) && isOpened === true) {
-        console.log('SELL');
+    else if (price >= (sma * 1.02) && isOpened) {
+        console.log("Vender!");
+        newOrder(SYMBOL, QUANTITY, "SELL");
         isOpened = false;
     }
-    else
-        console.log("Aguardando entrada ou saída");
 }
 
 setInterval(start, 3000);
 
 start();
-
-
-
-// let profitPercentage = (SELL_PRICE - BUY_PRICE) / BUY_PRICE * 10
-// console.log(profitPercentage); // output: 0.769230769230769
-
-// "https://api.coinbase.com/v2/prices/BTC-USD/buy";
